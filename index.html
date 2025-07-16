@@ -1,36 +1,137 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Tebak Angka Multiplayer</title>
+  <title>Lari Halang Multiplayer</title>
   <style>
-    body { background: #121212; color: white; font-family: Arial; text-align: center; padding: 20px; }
-    input, button { font-size: 20px; padding: 10px; margin-top: 20px; }
-    #messages { margin-top: 30px; max-width: 400px; margin-inline: auto; }
+    body { font-family: sans-serif; text-align: center; background: #111; color: white; }
+    canvas { background: #222; display: block; margin: 20px auto; border: 2px solid #fff; }
+    #leaderboard { margin-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>Tebak Angka!</h1>
-  <input id="input" type="number" placeholder="Tebak angka 1-100">
-  <button onclick="submit()">Tebak</button>
-  <div id="messages"></div>
+  <h1>Lari Halang Multiplayer</h1>
+  <div id="login">
+    <input id="username" placeholder="Username">
+    <input id="password" placeholder="Password" type="password">
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <button onclick="guest()">Guest</button>
+    <p id="error"></p>
+  </div>
+
+  <canvas id="game" width="500" height="200" style="display:none;"></canvas>
+  <div id="leaderboard"></div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     const socket = io();
-    const input = document.getElementById('input');
-    const messages = document.getElementById('messages');
+    let username = '';
+    let jumping = false;
+    let playerY = 150;
+    let velocity = 0;
+    const gravity = 0.7;
+    const obstacles = [];
+    let gameRunning = false;
 
-    function submit() {
-      const val = input.value;
-      if (val) socket.emit('guess', val);
-      input.value = '';
+    function register() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      socket.emit('register', { username: u, password: p }, res => {
+        if (res.error) showError(res.error);
+        else login();
+      });
     }
 
-    socket.on('message', msg => {
-      const div = document.createElement('div');
-      div.textContent = msg;
-      messages.prepend(div);
+    function login() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      socket.emit('login', { username: u, password: p }, res => {
+        if (res.error) showError(res.error);
+        else startGame(u);
+      });
+    }
+
+    function guest() {
+      socket.emit('guest', res => {
+        if (res.success) startGame(res.username);
+      });
+    }
+
+    function showError(msg) {
+      document.getElementById('error').textContent = msg;
+    }
+
+    function startGame(u) {
+      username = u;
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('game').style.display = 'block';
+      socket.emit('start');
+      gameRunning = true;
+      runGame();
+    }
+
+    function runGame() {
+      const canvas = document.getElementById('game');
+      const ctx = canvas.getContext('2d');
+
+      let frames = 0;
+      obstacles.length = 0;
+
+      function draw() {
+        if (!gameRunning) return;
+
+        ctx.clearRect(0, 0, 500, 200);
+
+        // Player
+        ctx.fillStyle = 'lime';
+        ctx.fillRect(50, playerY, 20, 20);
+
+        // Gravity
+        velocity += gravity;
+        playerY += velocity;
+
+        if (playerY > 150) {
+          playerY = 150;
+          velocity = 0;
+          jumping = false;
+        }
+
+        // Obstacles
+        if (frames % 90 === 0) {
+          obstacles.push({ x: 500, y: 160 });
+        }
+        ctx.fillStyle = 'red';
+        for (let o of obstacles) {
+          o.x -= 4;
+          ctx.fillRect(o.x, o.y, 20, 20);
+
+          if (o.x < 70 && o.x > 30 && playerY + 20 > o.y) {
+            // Collision
+            gameRunning = false;
+            socket.emit('crash');
+            alert("Kamu kalah! Refresh untuk main lagi.");
+          }
+        }
+
+        frames++;
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' && !jumping && gameRunning) {
+        velocity = -10;
+        jumping = true;
+      }
+    });
+
+    socket.on('leaderboard', data => {
+      const board = document.getElementById('leaderboard');
+      board.innerHTML = "<h3>🏆 Leaderboard 🏆</h3>" + data.map(d =>
+        `<p>${d.username}: ${d.score}s</p>`
+      ).join('');
     });
   </script>
 </body>
