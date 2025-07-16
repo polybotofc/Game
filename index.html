@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tebak Angka Multiplayer</title>
+  <style>
+    body { background: #121212; color: white; font-family: Arial; text-align: center; padding: 20px; }
+    input, button { font-size: 20px; padding: 10px; margin-top: 20px; }
+    #messages { margin-top: 30px; max-width: 400px; margin-inline: auto; }
+  </style>
+</head>
+<body>
+  <h1>Tebak Angka!</h1>
+  <input id="input" type="number" placeholder="Tebak angka 1-100">
+  <button onclick="submit()">Tebak</button>
+  <div id="messages"></div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    const socket = io();
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+
+    function submit() {
+      const val = input.value;
+      if (val) socket.emit('guess', val);
+      input.value = '';
+    }
+
+    socket.on('message', msg => {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      messages.prepend(div);
+    });
+  </script>
+</body>
+</html>
