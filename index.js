@@ -10,6 +10,20 @@ const io = new Server(server);
 
 let secretNumber = Math.floor(Math.random() * 100) + 1;
 
+// Serve index.html at "/"
+app.get('/', (req, res) => {
+  const filePath = path.join(__dirname, 'index.html');
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.status(500).send('Failed to load page');
+    } else {
+      res.setHeader('Content-Type', 'text/html');
+      res.end(data);
+    }
+  });
+});
+
+// Socket.io logic
 io.on('connection', (socket) => {
   console.log('Connected:', socket.id);
   socket.emit('message', 'Tebak angka antara 1 - 100!');
@@ -25,24 +39,14 @@ io.on('connection', (socket) => {
       socket.emit('message', 'Terlalu besar!');
     }
   });
-
-  socket.on('disconnect', () => {
-    console.log('Disconnected:', socket.id);
-  });
 });
 
-app.get('/', (req, res) => {
-  const file = path.join(__dirname, 'index.html');
-  res.setHeader('Content-Type', 'text/html');
-  res.send(fs.readFileSync(file, 'utf8'));
-});
-
+// Vercel handler
 module.exports = (req, res) => {
   if (!res.socket.server.io) {
-    server.listen(0, () => {
-      console.log('Server started');
-    });
+    server.listen(0, () => console.log('Socket server started'));
     res.socket.server.io = io;
   }
-  res.end('Multiplayer game running');
+
+  app(req, res); // <- Ini penting: jalankan Express app!
 };
